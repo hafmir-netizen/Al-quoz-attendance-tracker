@@ -107,4 +107,44 @@ result_sorted = result.sort_values("Attendance %", ascending=False, na_position=
 st.dataframe(result_sorted, use_container_width=True)
 
 csv = result_sorted.to_csv(index=False).encode("utf-8")
-st.download_button("Download results as CSV", data=csv, file_name="attendance_results.csv", mime="text/csv")
+st.download_button("Download rider results as CSV", data=csv, file_name="attendance_results.csv", mime="text/csv")
+
+# --- Daily absenteeism ---
+st.subheader("4. Daily absenteeism")
+st.caption("For each day, the % of riders marked Absent out of everyone with a recognized P or A that day. Week-offs and blanks are excluded.")
+
+daily_rows = []
+for col in status_cols:
+    col_series = df[col].apply(normalize_status)
+    p_count = (col_series == "P").sum()
+    a_count = (col_series == "A").sum()
+    counted = p_count + a_count
+    absent_pct = round(100 * a_count / counted, 1) if counted > 0 else None
+    daily_rows.append({
+        "Day": col,
+        "Present": p_count,
+        "Absent": a_count,
+        "Days Counted": counted,
+        "Absenteeism %": absent_pct,
+    })
+
+daily_result = pd.DataFrame(daily_rows)
+# Try to sort chronologically if the column headers are actual dates; otherwise leave as-is
+try:
+    daily_result["_sort_key"] = pd.to_datetime(daily_result["Day"])
+    daily_result = daily_result.sort_values("_sort_key").drop(columns="_sort_key")
+except Exception:
+    pass
+
+# Make the "Day" column display nicely whether it's a date or plain text
+daily_result["Day"] = daily_result["Day"].apply(
+    lambda d: d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
+)
+
+st.dataframe(daily_result, use_container_width=True)
+
+chart_data = daily_result.set_index("Day")["Absenteeism %"]
+st.bar_chart(chart_data)
+
+daily_csv = daily_result.to_csv(index=False).encode("utf-8")
+st.download_button("Download daily absenteeism as CSV", data=daily_csv, file_name="daily_absenteeism.csv", mime="text/csv")
